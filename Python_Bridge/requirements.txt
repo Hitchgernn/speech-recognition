@@ -1,0 +1,5 @@
+pyserial
+google-generativeai
+SpeechRecognition
+PyAudio
+python-dotenv
