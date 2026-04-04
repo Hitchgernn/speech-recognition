@@ -23,7 +23,7 @@ if not API_KEY:
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel("gemini-2.5-flash")
 
-SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyACM0")
+SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyACM2")
 BAUD_RATE = int(os.getenv("BAUD_RATE", "115200"))
 
 SYSTEM_PROMPT = """
@@ -143,10 +143,17 @@ def listening_loop():
                 queue_broadcast({"type": "status", "msg": "Menganalisis dengan Gemini AI..."})
                 full_prompt = f"{SYSTEM_PROMPT}\nInput: {text}"
                 response = model.generate_content(full_prompt)
-                ai_cmd = response.text.strip().upper()
+                
+                # Cari karakter valid (A, C, X) dalam hasil untuk menghindari teks tambahan dari AI
+                raw_res = response.text.strip().upper()
+                ai_cmd = ""
+                for char in raw_res:
+                    if char in ["A", "C", "X"]:
+                        ai_cmd = char
+                        break
 
-                if ai_cmd not in ["A", "C", "X"]:
-                    queue_broadcast({"type": "error", "msg": f"Format AI tidak valid: {ai_cmd}"})
+                if not ai_cmd:
+                    queue_broadcast({"type": "error", "msg": f"Format AI tidak valid: {raw_res}"})
                     continue
 
                 info = COMMAND_LABELS[ai_cmd]
