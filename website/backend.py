@@ -108,6 +108,8 @@ def queue_broadcast(payload: dict):
 # ---------- Listening loop (runs in thread) ----------
 def listening_loop():
     recognizer = sr.Recognizer()
+    # Tunggu 1.5 detik setelah suara berhenti sebelum menganggap kalimat selesai
+    recognizer.pause_threshold = 1.5
     queue_broadcast({"type": "status", "msg": "Mendengarkan... (ucapkan 'keluar' untuk berhenti)"})
 
     while not stop_event.is_set():
@@ -115,7 +117,9 @@ def listening_loop():
             with sr.Microphone() as source:
                 recognizer.adjust_for_ambient_noise(source, duration=0.4)
                 try:
-                    audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)
+                    # Menunggu sampai 10 detik sebelum mulai berbicara, 
+                    # dan mengizinkan rekaman sampai 20 detik
+                    audio = recognizer.listen(source, timeout=10, phrase_time_limit=20)
                 except sr.WaitTimeoutError:
                     queue_broadcast({"type": "listening_pulse"})
                     continue
