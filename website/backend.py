@@ -14,17 +14,16 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+BASE_DIR = Path(__file__).resolve().parent
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(BASE_DIR / ".env")
 API_KEY = os.getenv("GEMINI_API_KEY")
 if not API_KEY:
-    raise RuntimeError("GEMINI_API_KEY not found in .env")
+    raise RuntimeError("GEMINI_API_KEY not found in website/.env")
 
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel("gemini-2.5-flash")
-
-BASE_DIR = Path(__file__).resolve().parent
 
 SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyACM0")
 BAUD_RATE = int(os.getenv("BAUD_RATE", "115200"))
@@ -45,10 +44,16 @@ ATURAN SANDI:
 """
 
 COMMAND_LABELS = {
-    "A": {"label": "Panic / Bahaya", "color": "red"},
-    "C": {"label": "Santai / Fokus", "color": "cyan"},
+    "R": {"label": "Merah Blink / Bahaya", "color": "red"},
+    "S": {"label": "Merah Statis", "color": "red"},
+    "G": {"label": "Hijau Blink / Aman", "color": "green"},
+    "H": {"label": "Hijau Statis", "color": "green"},
+    "B": {"label": "Biru Blink / Proses", "color": "blue"},
+    "V": {"label": "Biru Statis", "color": "blue"},
     "X": {"label": "Mati / Tidur",   "color": "gray"},
 }
+
+VALID_COMMANDS = tuple(COMMAND_LABELS.keys())
 
 app = FastAPI(title="STM32 AI Voice Bridge")
 app.add_middleware(
@@ -167,11 +172,11 @@ def listening_loop():
                 full_prompt = f"{SYSTEM_PROMPT}\nInput: {text}"
                 response = model.generate_content(full_prompt)
                 
-                # Cari karakter valid (A, C, X) dalam hasil untuk menghindari teks tambahan dari AI
+                # Ambil huruf sandi valid pertama bila model mengembalikan teks tambahan.
                 raw_res = response.text.strip().upper()
                 ai_cmd = ""
                 for char in raw_res:
-                    if char in ["A", "C", "X"]:
+                    if char in VALID_COMMANDS:
                         ai_cmd = char
                         break
 
@@ -282,7 +287,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
             elif action == "send_command":
                 cmd = data.get("command", "").upper()
-                if cmd in ["A", "C", "X"]:
+                if cmd in VALID_COMMANDS:
                     resp = send_command(cmd)
                     info = COMMAND_LABELS[cmd]
                     await broadcast({
@@ -320,4 +325,4 @@ async def serve_index():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("website.backend:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
