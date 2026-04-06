@@ -5,6 +5,7 @@ import time
 import threading
 import queue
 import json
+from pathlib import Path
 from typing import Optional
 
 import google.generativeai as genai
@@ -23,15 +24,24 @@ if not API_KEY:
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel("gemini-2.5-flash")
 
-SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyACM2")
+BASE_DIR = Path(__file__).resolve().parent
+
+SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyACM0")
 BAUD_RATE = int(os.getenv("BAUD_RATE", "115200"))
 
 SYSTEM_PROMPT = """
-Analyze user sentiment for LED control.
-Respond ONLY with one of these letters:
-- A: Panic, anger, or danger
-- C: Relaxed, peaceful, or thinking
-- X: Off, sleep, or dark
+Kamu adalah SHINX sistem AI cerdas yang mengontrol 14 lampu LED (Merah, Hijau, Biru) di hardware fisik.
+Tugasmu adalah mematuhi perintah pengguna dan membalas dengan 1 HURUF SANDI saja!
+TIDAK BOLEH ADA KATA LAIN!
+
+ATURAN SANDI:
+- Perintah "hidupkan merah blink" atau jika situasi bahaya/panik -> Balas: R
+- Perintah "hidupkan merah statis" -> Balas: S
+- Perintah "hidupkan hijau blink" atau jika situasi aman/proses berjalan -> Balas: G
+- Perintah "hidupkan hijau statis" -> Balas: H
+- Perintah "hidupkan biru blink" atau jika cuaca dingin/berpikir -> Balas: B
+- Perintah "hidupkan biru statis" -> Balas: V
+- Perintah "matikan" atau "tidur" -> Balas: X
 """
 
 COMMAND_LABELS = {
@@ -58,6 +68,7 @@ is_listening = False
 listen_thread: Optional[threading.Thread] = None
 stop_event = threading.Event()
 message_queue: queue.Queue = queue.Queue()
+drain_task: Optional[asyncio.Task] = None
 
 # ---------- Serial helpers ----------
 def connect_serial():
@@ -100,7 +111,8 @@ async def broadcast(payload: dict):
         except Exception:
             dead.append(ws)
     for ws in dead:
-        active_connections.remove(ws)
+        if ws in active_connections:
+            active_connections.remove(ws)
 
 def queue_broadcast(payload: dict):
     message_queue.put(payload)
@@ -204,12 +216,35 @@ async def drain_queue():
 
 @app.on_event("startup")
 async def startup():
+    global drain_task
     ok, msg = connect_serial()
     if ok:
         print(f"[STM32] Connected. {msg}")
     else:
         print(f"[STM32] Not connected: {msg}")
-    asyncio.create_task(drain_queue())
+    drain_task = asyncio.create_task(drain_queue())
+
+@app.on_event("shutdown")
+async def shutdown():
+    global drain_task, stm32, stm32_connected
+    stop_event.set()
+
+    if drain_task is not None:
+        drain_task.cancel()
+        try:
+            await drain_task
+        except asyncio.CancelledError:
+            pass
+        drain_task = None
+
+    with stm32_lock:
+        if stm32 is not None:
+            try:
+                stm32.close()
+            except Exception:
+                pass
+            stm32 = None
+        stm32_connected = False
 
 # ---------- WebSocket endpoint ----------
 @app.websocket("/ws")
@@ -272,16 +307,17 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
 
     except WebSocketDisconnect:
-        active_connections.remove(websocket)
+        if websocket in active_connections:
+            active_connections.remove(websocket)
                        
 
 # ---------- Serve frontend ----------
-app.mount("/static", StaticFiles(directory="."), name="static")
+app.mount("/static", StaticFiles(directory=str(BASE_DIR)), name="static")
 
 @app.get("/")
 async def serve_index():
-    return FileResponse("index.html")
+    return FileResponse(BASE_DIR / "index.html")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("website.backend:app", host="0.0.0.0", port=8000, reload=False)

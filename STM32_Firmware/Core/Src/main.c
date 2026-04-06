@@ -113,6 +113,25 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
         }
     }
 }
+
+void Set_Green(uint8_t state)
+{
+    // Hijau di PB7, PB8, PB9
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9, state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+void Set_Blue(uint8_t state)
+{
+    // Biru di PB4, PB5, PB6
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6, state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+void Matikan_Semua_Lampu()
+{
+    Set_LEDs(0x00); // Matikan 8 Merah (PA0-PA7)
+    Set_Green(0);   // Matikan 3 Hijau (PB7-PB9)
+    Set_Blue(0);    // Matikan 3 Biru  (PB4-PB6)
+}
 /* USER CODE END 0 */
 
 /**
@@ -222,7 +241,7 @@ int main(void)
             debounce_pb14 = HAL_GetTick();
         }
         last_pb14 = pb14_state;
-        
+
         // ==========================================================
         // 3. LOGIKA STATE MACHINE
         // ==========================================================
@@ -288,21 +307,23 @@ int main(void)
         }
         else if (current_mode == 4)
         {
-            // --- MODE 4: AI USB LISTENER & ANIMATOR ---
-            // (Isi di bawah sini SAMA PERSIS dengan kode AI Mode 3 yang sebelumnya kamu punya)
+            // --- MODE 4: AI USB LISTENER (MERAH, HIJAU, BIRU) ---
 
             if (usb_data_ready == 1)
             {
                 usb_data_ready = 0;
-                if (usb_received_data == 'A' || usb_received_data == 'C' || usb_received_data == 'X')
+                // Jika huruf yang masuk ada di daftar sandi kita
+                if (strchr("RSGHBVX", usb_received_data) != NULL)
                 {
                     ai_current_state = usb_received_data;
+                    Matikan_Semua_Lampu(); // Reset lampu tiap ganti mode
                 }
             }
 
-            if (ai_current_state == 'A')
-            {
-                if (HAL_GetTick() - ai_timer >= 100)
+            // --- ANIMASI BERDASARKAN SANDI ---
+            if (ai_current_state == 'R')
+            { // MERAH BLINK
+                if (HAL_GetTick() - ai_timer >= 200)
                 {
                     ai_timer = HAL_GetTick();
                     ai_toggle = !ai_toggle;
@@ -312,21 +333,39 @@ int main(void)
                         Set_LEDs(0x00);
                 }
             }
-            else if (ai_current_state == 'C')
-            {
-                if (HAL_GetTick() - ai_timer >= 500)
+            else if (ai_current_state == 'S')
+            { // MERAH STATIS
+                Set_LEDs(0xFF);
+            }
+            else if (ai_current_state == 'G')
+            { // HIJAU BLINK
+                if (HAL_GetTick() - ai_timer >= 200)
                 {
                     ai_timer = HAL_GetTick();
                     ai_toggle = !ai_toggle;
-                    if (ai_toggle)
-                        Set_LEDs(0x55);
-                    else
-                        Set_LEDs(0xAA);
+                    Set_Green(ai_toggle);
                 }
             }
+            else if (ai_current_state == 'H')
+            { // HIJAU STATIS
+                Set_Green(1);
+            }
+            else if (ai_current_state == 'B')
+            { // BIRU BLINK
+                if (HAL_GetTick() - ai_timer >= 200)
+                {
+                    ai_timer = HAL_GetTick();
+                    ai_toggle = !ai_toggle;
+                    Set_Blue(ai_toggle);
+                }
+            }
+            else if (ai_current_state == 'V')
+            { // BIRU STATIS
+                Set_Blue(1);
+            }
             else
-            {
-                Set_LEDs(0x00);
+            { // MATIKAN (X)
+                Matikan_Semua_Lampu();
             }
         }
     }
@@ -449,11 +488,15 @@ static void MX_GPIO_Init(void)
     __HAL_RCC_GPIOB_CLK_ENABLE();
 
     /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8, GPIO_PIN_RESET);
+
+    /*Configure GPIO pin Output Level */
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9, GPIO_PIN_RESET);
 
     /*Configure GPIO pins : PA0 PA1 PA2 PA3
-                             PA4 PA5 PA6 PA7 */
-    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7;
+                             PA4 PA5 PA6 PA7
+                             PA8 */
+    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -470,6 +513,14 @@ static void MX_GPIO_Init(void)
     GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(BTN_INTERRUPT_GPIO_Port, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : PB4 PB5 PB6 PB7
+                             PB8 PB9 */
+    GPIO_InitStruct.Pin = GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     /* EXTI interrupt init*/
     HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
@@ -515,3 +566,4 @@ void assert_failed(uint8_t *file, uint32_t line)
     /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
