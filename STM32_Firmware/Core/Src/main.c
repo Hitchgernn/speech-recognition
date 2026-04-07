@@ -1,94 +1,96 @@
-/* USER CODE BEGIN Header */
+/* user code begin header */
 /**
  ******************************************************************************
- * @file           : main.c
- * @brief          : Main program body
- ******************************************************************************
- * @attention
- *
- * Copyright (c) 2026 STMicroelectronics.
- * All rights reserved.
- *
- * This software is licensed under terms that can be found in the LICENSE file
- * in the root directory of this software component.
- * If no LICENSE file comes with this software, it is provided AS-IS.
- *
- ******************************************************************************
- */
-/* USER CODE END Header */
-/* Includes ------------------------------------------------------------------*/
+	* @file           : main.c
+	* @brief          : main program body
+	******************************************************************************
+	* @attention
+	*
+	* copyright (c) 2026 stmicroelectronics.
+	* all rights reserved.
+	*
+	* this software is licensed under terms that can be found in the license file
+	* in the root directory of this software component.
+	* if no license file comes with this software, it is provided as-is.
+	*
+	******************************************************************************
+	*/
+/* user code end header */
+/* includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "usb_device.h"
 
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-#include "usbd_cdc_if.h" // Wajib untuk fungsi kirim USB
-#include "string.h"      // Wajib untuk strlen()
-/* USER CODE END Includes */
+/* private includes ----------------------------------------------------------*/
+/* user code begin includes */
+#include "usbd_cdc_if.h" // wajib untuk fungsi kirim usb
+#include "string.h"      // wajib untuk strlen()
+/* user code end includes */
 
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
+/* private typedef -----------------------------------------------------------*/
+/* user code begin ptd */
 
-/* USER CODE END PTD */
+/* user code end ptd */
 
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
+/* private define ------------------------------------------------------------*/
+/* user code begin pd */
 
-/* USER CODE END PD */
+/* user code end pd */
 
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
+/* private macro -------------------------------------------------------------*/
+/* user code begin pm */
 
-/* USER CODE END PM */
+/* user code end pm */
 
-/* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
+/* private variables ---------------------------------------------------------*/
+adc_handletypedef hadc1;
 
-/* USER CODE BEGIN PV */
-// --- Variabel State Machine ---
-uint8_t current_mode = 1; // 1=Shift, 2=Sawtooth, 3=AI Mode
+/* user code begin pv */
+// --- variabel state machine ---
+uint8_t current_mode = 1; // 1=shift, 2=sawtooth, 3=ai mode
 
-// --- Variabel Interupsi (EXTI PB13) ---
+// --- variabel interupsi (exti pb13) ---
 volatile uint8_t exti_flag = 0;
 volatile uint32_t exti_timer = 0;
 
-// --- Variabel Mode 1 (Shift) ---
+// --- variabel mode 1 (shift) ---
 uint8_t led_pos = 0;
 uint32_t mode1_timer = 0;
 
-// --- Variabel Mode 2 (Sawtooth) ---
+// --- variabel mode 2 (sawtooth) ---
 uint32_t sawtooth_val = 0;
 uint8_t sawtooth_phase = 1;
 uint32_t mode2_timer = 0;
 
-// --- Variabel Mode 3 (Potensiometer) ---
-uint32_t pot_val = 0; // Menyimpan nilai ADC (0-4095) untuk CubeMonitor
+// --- variabel mode 3 (potensiometer) ---
+uint32_t pot_val = 0; // menyimpan nilai adc (0-4095) untuk cubemonitor
 
-// --- Variabel Debounce Tombol ---
+// --- variabel debounce tombol ---
 uint8_t last_pb12 = 1, last_pb14 = 1;
 uint32_t debounce_pb12 = 0, debounce_pb14 = 0;
 
-// --- Variabel Jembatan USB AI ---
-uint8_t usb_received_data = 0; // Menyimpan huruf dari Python
-uint8_t usb_data_ready = 0;    // Flag pesan masuk
-uint8_t ai_led_pattern = 0x00; // Pola LED yang dikendalikan AI
+// --- variabel jembatan usb ai ---
+uint8_t usb_received_data = 0; // menyimpan huruf dari python
+uint8_t usb_data_ready = 0;    // flag pesan masuk
+uint8_t ai_led_pattern = 0x00; // pola led yang dikendalikan ai
 
-// --- Variabel Animasi AI Mode ---
-char ai_current_state = 'X'; // Menyimpan status AI (A, C, atau X), default: X (Mati)
-uint32_t ai_timer = 0;       // Timer untuk kedipan AI
-uint8_t ai_toggle = 0;       // Penanda nyala/mati bergantian
-/* USER CODE END PV */
+// --- variabel animasi ai mode ---
+char ai_current_state = 'x'; // menyimpan status ai (a, c, atau x), default: x (mati)
+uint32_t ai_timer = 0;       // timer untuk kedipan ai
+uint8_t ai_toggle = 0;       // penanda nyala/mati bergantian
+/* user code end pv */
 
-/* Private function prototypes -----------------------------------------------*/
-void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_ADC1_Init(void);
-/* USER CODE BEGIN PFP */
+/* private function prototypes -----------------------------------------------*/
+void systemclock_config(void);
+static void mx_gpio_init(void);
+static void mx_adc1_init(void);
+/* user code begin pfp */
 
-/* USER CODE END PFP */
+/* user code end pfp */
 
-/* Private user code ---------------------------------------------------------*/
+/* private user code ---------------------------------------------------------*/
+/* user code begin 0 */
 /* USER CODE BEGIN 0 */
+
 void Set_LEDs(uint8_t val)
 {
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, (val & 0x01) ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -104,7 +106,7 @@ void Set_LEDs(uint8_t val)
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
     if (GPIO_Pin == GPIO_PIN_13)
-    { // Jika PB13 (Interrupt) ditekan
+    { // jika pb13 (interrupt) ditekan
         if (exti_flag == 0)
         {
             exti_flag = 1;
@@ -116,454 +118,406 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
 void Set_Green(uint8_t state)
 {
-    // Hijau di PB7, PB8, PB9
+    // hijau di pb7, pb8, pb9
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9, state ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
 void Set_Blue(uint8_t state)
 {
-    // Biru di PB4, PB5, PB6
+    // biru di pb4, pb5, pb6
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6, state ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
-void Matikan_Semua_Lampu()
+void Matikan_Semua_Lampu(void)
 {
-    Set_LEDs(0x00); // Matikan 8 Merah (PA0-PA7)
-    Set_Green(0);   // Matikan 3 Hijau (PB7-PB9)
-    Set_Blue(0);    // Matikan 3 Biru  (PB4-PB6)
+    Set_LEDs(0x00); // matikan 8 merah (pa0-pa7)
+    Set_Green(0);   // matikan 3 hijau (pb7-pb9)
+    Set_Blue(0);    // matikan 3 biru  (pb4-pb6)
 }
-/* USER CODE END 0 */
+
+// ... (Biarkan fungsi Handle_Interrupt_Task, Read_Buttons, Run_Mode1, dsb yang di bawahnya TETAP ADA) ...
+// --- 1. FUNGSI INTERUPSI (EXTI 5 Detik) ---
+void Handle_Interrupt_Task(void) {
+    if (exti_flag == 1) {
+        if (HAL_GetTick() - exti_timer >= 5000) {
+            exti_flag = 0;
+            Matikan_Semua_Lampu();
+        }
+    }
+}
+
+// --- 2. FUNGSI PEMBACAAN TOMBOL ---
+void Read_Buttons(void) {
+    // PB12: Cycle Mode 1 -> Mode 2 -> Mode 3
+    uint8_t pb12_state = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_12);
+    if (pb12_state == GPIO_PIN_RESET && last_pb12 == GPIO_PIN_SET && (HAL_GetTick() - debounce_pb12 > 50)) {
+        if (current_mode == 0 || current_mode == 4) {
+            current_mode = 1;
+        } else {
+            current_mode++; 
+            if (current_mode > 3) current_mode = 1; 
+        }
+        Matikan_Semua_Lampu();
+        debounce_pb12 = HAL_GetTick();
+    }
+    last_pb12 = pb12_state;
+
+    // PB14: Masuk / Keluar Mode AI (Mode 4)
+    uint8_t pb14_state = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_14);
+    if (pb14_state == GPIO_PIN_RESET && last_pb14 == GPIO_PIN_SET && (HAL_GetTick() - debounce_pb14 > 50)) {
+        if (current_mode != 4) {
+            current_mode = 4;
+            Matikan_Semua_Lampu();
+            ai_current_state = 'X';
+            char msg[] = "\r\n[STM32] Mode AI Aktif!\r\n";
+            CDC_Transmit_FS((uint8_t *)msg, strlen(msg));
+        } else {
+            current_mode = 0;
+            Matikan_Semua_Lampu();
+            char msg[] = "\r\n[STM32] Standby.\r\n";
+            CDC_Transmit_FS((uint8_t *)msg, strlen(msg));
+        }
+        debounce_pb14 = HAL_GetTick();
+    }
+    last_pb14 = pb14_state;
+}
+
+// --- 3. FUNGSI MODE 1 (SHIFT LEFT) ---
+void Run_Mode1_Shift(void) {
+    if (HAL_GetTick() - mode1_timer >= 200) {
+        mode1_timer = HAL_GetTick();
+        Set_LEDs(1 << led_pos);
+        led_pos++;
+        if (led_pos > 7) led_pos = 0;
+    }
+}
+
+// --- 4. FUNGSI MODE 2 (SAWTOOTH NIM) ---
+void Run_Mode2_Sawtooth(void) {
+    Set_LEDs(0x00);
+    if (HAL_GetTick() - mode2_timer >= 50) {
+        mode2_timer = HAL_GetTick();
+        sawtooth_val++;
+
+        // JANGAN LUPA: Ganti angka 68 dan 58 di bawah ini dengan 2 Digit NIM Kelompokmu!
+        if (sawtooth_phase == 1) {
+            if (sawtooth_val > 68) { sawtooth_val = 0; sawtooth_phase = 2; }
+        } else {
+            if (sawtooth_val > 58) { sawtooth_val = 0; sawtooth_phase = 1; }
+        }
+    }
+}
+
+// --- 5. FUNGSI MODE 3 (ADC POTENSIO) ---
+void Run_Mode3_ADC(void) {
+    HAL_ADC_Start(&hadc1);
+    if (HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK) {
+        pot_val = HAL_ADC_GetValue(&hadc1);
+        uint8_t num_leds = (pot_val * 9) / 4096;
+        uint8_t led_pattern = (1 << num_leds) - 1;
+        Set_LEDs(led_pattern);
+    }
+}
+
+// --- 6. FUNGSI MODE 4 (AI LISTENER) ---
+void Run_Mode4_AI(void) {
+    if (usb_data_ready == 1) {
+        usb_data_ready = 0;
+        // Ganti string di bawah ini menjadi HURUF KAPITAL semua
+        if (strchr("RSGHBVX", usb_received_data) != NULL) {
+            ai_current_state = usb_received_data;
+            Matikan_Semua_Lampu();
+        }
+    }
+
+    // Ganti semua pengecekan karakter di bawah ini menjadi KAPITAL
+    if (ai_current_state == 'R') {
+        if (HAL_GetTick() - ai_timer >= 200) {
+            ai_timer = HAL_GetTick();
+            ai_toggle = !ai_toggle;
+            if (ai_toggle) Set_LEDs(0xFF); else Set_LEDs(0x00);
+        }
+    } 
+    else if (ai_current_state == 'S') { Set_LEDs(0xFF); }
+    else if (ai_current_state == 'G') {
+        if (HAL_GetTick() - ai_timer >= 200) {
+            ai_timer = HAL_GetTick();
+            ai_toggle = !ai_toggle;
+            Set_Green(ai_toggle);
+        }
+    }
+    else if (ai_current_state == 'H') { Set_Green(1); }
+    else if (ai_current_state == 'B') {
+        if (HAL_GetTick() - ai_timer >= 200) {
+            ai_timer = HAL_GetTick();
+            ai_toggle = !ai_toggle;
+            Set_Blue(ai_toggle);
+        }
+    }
+    else if (ai_current_state == 'V') { Set_Blue(1); }
+    else { Matikan_Semua_Lampu(); }
+}
+/* user code end 0 */
 
 /**
- * @brief  The application entry point.
+ * @brief  the application entry point.
  * @retval int
  */
 int main(void)
 {
 
-    /* USER CODE BEGIN 1 */
+	/* user code begin 1 */
 
-    /* USER CODE END 1 */
+	/* user code end 1 */
 
-    /* MCU Configuration--------------------------------------------------------*/
+	/* mcu configuration--------------------------------------------------------*/
 
-    /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-    HAL_Init();
+	/* reset of all peripherals, initializes the flash interface and the systick. */
+	hal_init();
 
-    /* USER CODE BEGIN Init */
+	/* user code begin init */
 
-    /* USER CODE END Init */
+	/* user code end init */
 
-    /* Configure the system clock */
-    SystemClock_Config();
+	/* configure the system clock */
+	systemclock_config();
 
-    /* USER CODE BEGIN SysInit */
+	/* user code begin sysinit */
 
-    /* USER CODE END SysInit */
+	/* user code end sysinit */
 
-    /* Initialize all configured peripherals */
-    MX_GPIO_Init();
-    MX_USB_DEVICE_Init();
-    MX_ADC1_Init();
-    /* USER CODE BEGIN 2 */
+	/* initialize all configured peripherals */
+	mx_gpio_init();
+	mx_usb_device_init();
+	mx_adc1_init();
+	/* user code begin 2 */
 
-    /* USER CODE END 2 */
+	/* user code end 2 */
 
-    /* Infinite loop */
-    /* USER CODE BEGIN WHILE */
-    while (1)
-    {
-        // ==========================================================
-        // 1. BLOK INTERUPSI 5 DETIK
-        // ==========================================================
-        if (exti_flag == 1)
-        {
-            if (HAL_GetTick() - exti_timer >= 5000)
-            {
-                exti_flag = 0;
-                Set_LEDs(0x00);
-            }
-            else
-            {
-                continue; // Pause logika lain selama interupsi
-            }
+	/* infinite loop */
+	/* user code begin while */
+	while (1)
+	{
+		// 1. Cek apakah ada interupsi 5 detik yang sedang berjalan
+        Handle_Interrupt_Task();
+        
+        // Jika sedang interupsi, pause (lewati) pembacaan mode di bawahnya
+        if (exti_flag == 1) {
+            continue; 
         }
 
-        // ==========================================================
-        // 2. PEMBACAAN TOMBOL (PB12 & PB14)
-        // ==========================================================
-        // PB12: Cycle Mode 1 -> Mode 2 -> Mode 3
-        uint8_t pb12_state = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_12);
-        if (pb12_state == GPIO_PIN_RESET && last_pb12 == GPIO_PIN_SET && (HAL_GetTick() - debounce_pb12 > 50))
-        {
-            // Jika sedang di mode AI atau Standby, paksa mulai dari Mode 1
-            if (current_mode == 0 || current_mode == 4)
-            {
-                current_mode = 1;
-            }
-            else
-            {
-                current_mode++; // Lanjut ke mode berikutnya
-                if (current_mode > 3)
-                    current_mode = 1; // Balik lagi ke 1
-            }
+        // 2. Baca input tombol
+        Read_Buttons();
 
-            Set_LEDs(0x00);
-            debounce_pb12 = HAL_GetTick();
+        // 3. Jalankan Mode yang sedang aktif
+        if (current_mode == 1) {
+            Run_Mode1_Shift();
+        } 
+        else if (current_mode == 2) {
+            Run_Mode2_Sawtooth();
+        } 
+        else if (current_mode == 3) {
+            Run_Mode3_ADC();
+        } 
+        else if (current_mode == 4) {
+            Run_Mode4_AI();
         }
-        last_pb12 = pb12_state;
+	}
+	/* user code end while */
 
-        // PB14: Masuk / Keluar Mode AI (Mode 4)
-        uint8_t pb14_state = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_14);
-        if (pb14_state == GPIO_PIN_RESET && last_pb14 == GPIO_PIN_SET && (HAL_GetTick() - debounce_pb14 > 50))
-        {
-
-            if (current_mode != 4)
-            {
-                // Jika BUKAN Mode 4 -> MASUK Mode AI
-                current_mode = 4;
-                Set_LEDs(0x00);
-                ai_current_state = 'X';
-
-                char msg[] = "\r\n[STM32] Mode AI Aktif! Menunggu perintah...\r\n";
-                CDC_Transmit_FS((uint8_t *)msg, strlen(msg));
-            }
-            else
-            {
-                // Jika SUDAH Mode 4 -> KELUAR (Standby Mode 0)
-                current_mode = 0;
-                Set_LEDs(0x00);
-
-                char msg[] = "\r\n[STM32] Keluar dari Mode AI. Standby.\r\n";
-                CDC_Transmit_FS((uint8_t *)msg, strlen(msg));
-            }
-
-            debounce_pb14 = HAL_GetTick();
-        }
-        last_pb14 = pb14_state;
-
-        // ==========================================================
-        // 3. LOGIKA STATE MACHINE
-        // ==========================================================
-        if (current_mode == 1)
-        {
-            // --- MODE 1: SHIFT LEFT ---
-            if (HAL_GetTick() - mode1_timer >= 200)
-            { // Kecepatan statis 200ms
-                mode1_timer = HAL_GetTick();
-                Set_LEDs(1 << led_pos);
-                led_pos++;
-                if (led_pos > 7)
-                    led_pos = 0;
-            }
-        }
-        else if (current_mode == 2)
-        {
-            // --- MODE 2: SAWTOOTH GENERATOR ---
-            Set_LEDs(0x00);
-
-            if (HAL_GetTick() - mode2_timer >= 50)
-            {
-                mode2_timer = HAL_GetTick();
-                sawtooth_val++;
-
-                if (sawtooth_phase == 1)
-                {
-                    if (sawtooth_val > 68)
-                    {
-                        sawtooth_val = 0;
-                        sawtooth_phase = 2;
-                    }
-                }
-                else
-                {
-                    if (sawtooth_val > 58)
-                    {
-                        sawtooth_val = 0;
-                        sawtooth_phase = 1;
-                    }
-                }
-            }
-        }
-        else if (current_mode == 3)
-        {
-            // --- MODE 3: POTENSIOMETER (ADC ke LED) ---
-
-            HAL_ADC_Start(&hadc1); // Mulai baca ADC
-
-            if (HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK)
-            {
-                pot_val = HAL_ADC_GetValue(&hadc1); // Dapatkan nilai 0-4095
-
-                // Rumus matematika untuk mengubah rentang 0-4095 menjadi 0-8
-                uint8_t num_leds = (pot_val * 9) / 4096;
-
-                // Nyalakan LED sesuai jumlah num_leds (Efek Bar-Graph)
-                // Contoh: Jika num_leds = 3, maka (1<<3)-1 = 7 (Biner: 00000111) -> 3 LED menyala
-                uint8_t led_pattern = (1 << num_leds) - 1;
-
-                Set_LEDs(led_pattern);
-            }
-        }
-        else if (current_mode == 4)
-        {
-            // --- MODE 4: AI USB LISTENER (MERAH, HIJAU, BIRU) ---
-
-            if (usb_data_ready == 1)
-            {
-                usb_data_ready = 0;
-                // Jika huruf yang masuk ada di daftar sandi kita
-                if (strchr("RSGHBVX", usb_received_data) != NULL)
-                {
-                    ai_current_state = usb_received_data;
-                    Matikan_Semua_Lampu(); // Reset lampu tiap ganti mode
-                }
-            }
-
-            // --- ANIMASI BERDASARKAN SANDI ---
-            if (ai_current_state == 'R')
-            { // MERAH BLINK
-                if (HAL_GetTick() - ai_timer >= 200)
-                {
-                    ai_timer = HAL_GetTick();
-                    ai_toggle = !ai_toggle;
-                    if (ai_toggle)
-                        Set_LEDs(0xFF);
-                    else
-                        Set_LEDs(0x00);
-                }
-            }
-            else if (ai_current_state == 'S')
-            { // MERAH STATIS
-                Set_LEDs(0xFF);
-            }
-            else if (ai_current_state == 'G')
-            { // HIJAU BLINK
-                if (HAL_GetTick() - ai_timer >= 200)
-                {
-                    ai_timer = HAL_GetTick();
-                    ai_toggle = !ai_toggle;
-                    Set_Green(ai_toggle);
-                }
-            }
-            else if (ai_current_state == 'H')
-            { // HIJAU STATIS
-                Set_Green(1);
-            }
-            else if (ai_current_state == 'B')
-            { // BIRU BLINK
-                if (HAL_GetTick() - ai_timer >= 200)
-                {
-                    ai_timer = HAL_GetTick();
-                    ai_toggle = !ai_toggle;
-                    Set_Blue(ai_toggle);
-                }
-            }
-            else if (ai_current_state == 'V')
-            { // BIRU STATIS
-                Set_Blue(1);
-            }
-            else
-            { // MATIKAN (X)
-                Matikan_Semua_Lampu();
-            }
-        }
-    }
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
-    /* USER CODE END 3 */
+	/* user code begin 3 */
+	/* user code end 3 */
 }
 
 /**
- * @brief System Clock Configuration
- * @retval None
+ * @brief system clock configuration
+ * @retval none
  */
-void SystemClock_Config(void)
+void systemclock_config(void)
 {
-    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+	rcc_oscinittypedef rcc_oscinitstruct = {0};
+	rcc_clkinittypedef rcc_clkinitstruct = {0};
 
-    /** Configure the main internal regulator output voltage
-     */
-    __HAL_RCC_PWR_CLK_ENABLE();
-    __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
+	/** configure the main internal regulator output voltage
+	 */
+	__hal_rcc_pwr_clk_enable();
+	__hal_pwr_voltagescaling_config(pwr_regulator_voltage_scale2);
 
-    /** Initializes the RCC Oscillators according to the specified parameters
-     * in the RCC_OscInitTypeDef structure.
-     */
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-    RCC_OscInitStruct.PLL.PLLM = 25;
-    RCC_OscInitStruct.PLL.PLLN = 336;
-    RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
-    RCC_OscInitStruct.PLL.PLLQ = 7;
-    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-    {
-        Error_Handler();
-    }
+	/** initializes the rcc oscillators according to the specified parameters
+	 * in the rcc_oscinittypedef structure.
+	 */
+	rcc_oscinitstruct.oscillatortype = rcc_oscillatortype_hse;
+	rcc_oscinitstruct.hsestate = rcc_hse_on;
+	rcc_oscinitstruct.pll.pllstate = rcc_pll_on;
+	rcc_oscinitstruct.pll.pllsource = rcc_pllsource_hse;
+	rcc_oscinitstruct.pll.pllm = 25;
+	rcc_oscinitstruct.pll.plln = 336;
+	rcc_oscinitstruct.pll.pllp = rcc_pllp_div4;
+	rcc_oscinitstruct.pll.pllq = 7;
+	if (hal_rcc_oscconfig(&rcc_oscinitstruct) != hal_ok)
+	{
+		error_handler();
+	}
 
-    /** Initializes the CPU, AHB and APB buses clocks
-     */
-    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+	/** initializes the cpu, ahb and apb buses clocks
+	 */
+	rcc_clkinitstruct.clocktype = rcc_clocktype_hclk | rcc_clocktype_sysclk | rcc_clocktype_pclk1 | rcc_clocktype_pclk2;
+	rcc_clkinitstruct.sysclksource = rcc_sysclksource_pllclk;
+	rcc_clkinitstruct.ahbclkdivider = rcc_sysclk_div1;
+	rcc_clkinitstruct.apb1clkdivider = rcc_hclk_div2;
+	rcc_clkinitstruct.apb2clkdivider = rcc_hclk_div1;
 
-    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-    {
-        Error_Handler();
-    }
+	if (hal_rcc_clockconfig(&rcc_clkinitstruct, flash_latency_2) != hal_ok)
+	{
+		error_handler();
+	}
 }
 
 /**
- * @brief ADC1 Initialization Function
- * @param None
- * @retval None
+ * @brief adc1 initialization function
+ * @param none
+ * @retval none
  */
-static void MX_ADC1_Init(void)
+static void mx_adc1_init(void)
 {
 
-    /* USER CODE BEGIN ADC1_Init 0 */
+	/* user code begin adc1_init 0 */
 
-    /* USER CODE END ADC1_Init 0 */
+	/* user code end adc1_init 0 */
 
-    ADC_ChannelConfTypeDef sConfig = {0};
+	adc_channelconftypedef sconfig = {0};
 
-    /* USER CODE BEGIN ADC1_Init 1 */
+	/* user code begin adc1_init 1 */
 
-    /* USER CODE END ADC1_Init 1 */
+	/* user code end adc1_init 1 */
 
-    /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
-     */
-    hadc1.Instance = ADC1;
-    hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
-    hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-    hadc1.Init.ScanConvMode = DISABLE;
-    hadc1.Init.ContinuousConvMode = DISABLE;
-    hadc1.Init.DiscontinuousConvMode = DISABLE;
-    hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-    hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-    hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-    hadc1.Init.NbrOfConversion = 1;
-    hadc1.Init.DMAContinuousRequests = DISABLE;
-    hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-    if (HAL_ADC_Init(&hadc1) != HAL_OK)
-    {
-        Error_Handler();
-    }
+	/** configure the global features of the adc (clock, resolution, data alignment and number of conversion)
+	 */
+	hadc1.instance = adc1;
+	hadc1.init.clockprescaler = adc_clock_sync_pclk_div4;
+	hadc1.init.resolution = adc_resolution_12b;
+	hadc1.init.scanconvmode = disable;
+	hadc1.init.continuousconvmode = disable;
+	hadc1.init.discontinuousconvmode = disable;
+	hadc1.init.externaltrigconvedge = adc_externaltrigconvedge_none;
+	hadc1.init.externaltrigconv = adc_software_start;
+	hadc1.init.dataalign = adc_dataalign_right;
+	hadc1.init.nbrofconversion = 1;
+	hadc1.init.dmacontinuousrequests = disable;
+	hadc1.init.eocselection = adc_eoc_single_conv;
+	if (hal_adc_init(&hadc1) != hal_ok)
+	{
+		error_handler();
+	}
 
-    /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-     */
-    sConfig.Channel = ADC_CHANNEL_8;
-    sConfig.Rank = 1;
-    sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-    {
-        Error_Handler();
-    }
-    /* USER CODE BEGIN ADC1_Init 2 */
+	/** configure for the selected adc regular channel its corresponding rank in the sequencer and its sample time.
+	 */
+	sconfig.channel = adc_channel_8;
+	sconfig.rank = 1;
+	sconfig.samplingtime = adc_sampletime_3cycles;
+	if (hal_adc_configchannel(&hadc1, &sconfig) != hal_ok)
+	{
+		error_handler();
+	}
+	/* user code begin adc1_init 2 */
 
-    /* USER CODE END ADC1_Init 2 */
+	/* user code end adc1_init 2 */
 }
 
 /**
- * @brief GPIO Initialization Function
- * @param None
- * @retval None
+ * @brief gpio initialization function
+ * @param none
+ * @retval none
  */
-static void MX_GPIO_Init(void)
+static void mx_gpio_init(void)
 {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    /* USER CODE BEGIN MX_GPIO_Init_1 */
+	gpio_inittypedef gpio_initstruct = {0};
+	/* user code begin mx_gpio_init_1 */
 
-    /* USER CODE END MX_GPIO_Init_1 */
+	/* user code end mx_gpio_init_1 */
 
-    /* GPIO Ports Clock Enable */
-    __HAL_RCC_GPIOH_CLK_ENABLE();
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
+	/* gpio ports clock enable */
+	__hal_rcc_gpioh_clk_enable();
+	__hal_rcc_gpioa_clk_enable();
+	__hal_rcc_gpiob_clk_enable();
 
-    /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8, GPIO_PIN_RESET);
+	/*configure gpio pin output level */
+	hal_gpio_writepin(gpioa, gpio_pin_0 | gpio_pin_1 | gpio_pin_2 | gpio_pin_3 | gpio_pin_4 | gpio_pin_5 | gpio_pin_6 | gpio_pin_7 | gpio_pin_8, gpio_pin_reset);
 
-    /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9, GPIO_PIN_RESET);
+	/*configure gpio pin output level */
+	hal_gpio_writepin(gpiob, gpio_pin_4 | gpio_pin_5 | gpio_pin_6 | gpio_pin_7 | gpio_pin_8 | gpio_pin_9, gpio_pin_reset);
 
-    /*Configure GPIO pins : PA0 PA1 PA2 PA3
-                             PA4 PA5 PA6 PA7
-                             PA8 */
-    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+	/*configure gpio pins : pa0 pa1 pa2 pa3
+								pa4 pa5 pa6 pa7
+								pa8 */
+	gpio_initstruct.pin = gpio_pin_0 | gpio_pin_1 | gpio_pin_2 | gpio_pin_3 | gpio_pin_4 | gpio_pin_5 | gpio_pin_6 | gpio_pin_7 | gpio_pin_8;
+	gpio_initstruct.mode = gpio_mode_output_pp;
+	gpio_initstruct.pull = gpio_nopull;
+	gpio_initstruct.speed = gpio_speed_freq_low;
+	hal_gpio_init(gpioa, &gpio_initstruct);
 
-    /*Configure GPIO pins : BTN_MODE_Pin BTN_AI_Pin */
-    GPIO_InitStruct.Pin = BTN_MODE_Pin | BTN_AI_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	/*configure gpio pins : btn_mode_pin btn_ai_pin */
+	gpio_initstruct.pin = btn_mode_pin | btn_ai_pin;
+	gpio_initstruct.mode = gpio_mode_input;
+	gpio_initstruct.pull = gpio_pullup;
+	hal_gpio_init(gpiob, &gpio_initstruct);
 
-    /*Configure GPIO pin : BTN_INTERRUPT_Pin */
-    GPIO_InitStruct.Pin = BTN_INTERRUPT_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(BTN_INTERRUPT_GPIO_Port, &GPIO_InitStruct);
+	/*configure gpio pin : btn_interrupt_pin */
+	gpio_initstruct.pin = btn_interrupt_pin;
+	gpio_initstruct.mode = gpio_mode_it_falling;
+	gpio_initstruct.pull = gpio_pullup;
+	hal_gpio_init(btn_interrupt_gpio_port, &gpio_initstruct);
 
-    /*Configure GPIO pins : PB4 PB5 PB6 PB7
-                             PB8 PB9 */
-    GPIO_InitStruct.Pin = GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	/*configure gpio pins : pb4 pb5 pb6 pb7
+								pb8 pb9 */
+	gpio_initstruct.pin = gpio_pin_4 | gpio_pin_5 | gpio_pin_6 | gpio_pin_7 | gpio_pin_8 | gpio_pin_9;
+	gpio_initstruct.mode = gpio_mode_output_pp;
+	gpio_initstruct.pull = gpio_nopull;
+	gpio_initstruct.speed = gpio_speed_freq_low;
+	hal_gpio_init(gpiob, &gpio_initstruct);
 
-    /* EXTI interrupt init*/
-    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+	/* exti interrupt init*/
+	hal_nvic_setpriority(exti15_10_irqn, 0, 0);
+	hal_nvic_enableirq(exti15_10_irqn);
 
-    /* USER CODE BEGIN MX_GPIO_Init_2 */
+	/* user code begin mx_gpio_init_2 */
 
-    /* USER CODE END MX_GPIO_Init_2 */
+	/* user code end mx_gpio_init_2 */
 }
 
-/* USER CODE BEGIN 4 */
+/* user code begin 4 */
 
-/* USER CODE END 4 */
+/* user code end 4 */
 
 /**
- * @brief  This function is executed in case of error occurrence.
- * @retval None
+ * @brief  this function is executed in case of error occurrence.
+ * @retval none
  */
-void Error_Handler(void)
+void error_handler(void)
 {
-    /* USER CODE BEGIN Error_Handler_Debug */
-    /* User can add his own implementation to report the HAL error return state */
-    __disable_irq();
-    while (1)
-    {
-    }
-    /* USER CODE END Error_Handler_Debug */
+	/* user code begin error_handler_debug */
+	/* user can add his own implementation to report the hal error return state */
+	__disable_irq();
+	while (1)
+	{
+	}
+	/* user code end error_handler_debug */
 }
 
-#ifdef USE_FULL_ASSERT
+#ifdef use_full_assert
 /**
- * @brief  Reports the name of the source file and the source line number
+ * @brief  reports the name of the source file and the source line number
  *         where the assert_param error has occurred.
  * @param  file: pointer to the source file name
  * @param  line: assert_param error line source number
- * @retval None
+ * @retval none
  */
 void assert_failed(uint8_t *file, uint32_t line)
 {
-    /* USER CODE BEGIN 6 */
-    /* User can add his own implementation to report the file name and line number,
-       ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-    /* USER CODE END 6 */
+	/* user code begin 6 */
+	/* user can add his own implementation to report the file name and line number,
+		ex: printf("wrong parameters value: file %s on line %d\r\n", file, line) */
+	/* user code end 6 */
 }
-#endif /* USE_FULL_ASSERT */
+#endif /* use_full_assert */
 
